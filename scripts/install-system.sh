@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # -------------------------------------------------------------------------------------------------
-# Pi-PwnBox-RogueAP 
-# https://github.com/koutto/pi-pwnbox-rogueap
-# -------------------------------------------------------------------------------------------------
+# Pi-PwnBox-RogueAP
+# https://github.com/3isenHeiM/pi-pwnbox-rogueap# -------------------------------------------------------------------------------------------------
 # Install Script - IMPORTANT: EDIT CONFIGURATION BEFORE RUNNING IT !
-# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 
 
 
@@ -28,10 +27,10 @@ GUACAMOLE_MYSQL_PASSWORD="MyGuacamoleMySQLPassword"
 # (when eth0 is not used).
 
 # WiFi USB Adapter Dongle BrosTrend AC1200 Model No AC1L: Realtek RTL88x2bu
-WLAN_INTERFACE_BROSTREND_AC1L="wlxaabbccddeeff"
+WLAN_INTERFACE_TENDA_NANO="wlxaabbccddeeff"
 
 # WiFi USB Adapter Dongle Alfa AWUS036NEH: Ralink RT2870/RT3070
-WLAN_INTERFACE_ALFA_AWUS036NEH="wlxaabbccddeeff"
+WLAN_INTERFACE_TENDA_U12="wlxaabbccddeeff"
 
 # WiFi USB Adapter Alfa AWUS036ACH: Realtek RTL8812AU
 WLAN_INTERFACE_ALFA_AWUS036ACH="wlxaabbccddeeff"
@@ -49,6 +48,26 @@ MAC_WLAN0="aa:bb:cc:dd:ee:ff"
 WIFI_SSID="WifiSsid"
 WIFI_PASSPHRASE="MyPassphrase"
 
+# -------------------------------------------------------------------------------------------------
+
+
+# Function of each Wireless interface
+
+# Interface which will spawn an AP for remote connection to the Raspberry Pi
+WLAN_INTERFACE_REMOTE_ACCESS="wlan0"
+# Wireless interface used for internet connectivity
+WLAN_INTERFACE_INTERNET=$WLAN_INTERFACE_TENDA_U12
+
+
+# Remote Access SSID
+# This will be the wi-fi network spawnes by the Raspberry for remote access
+WIFI_SSID_REMOTE_ACCESS="PWNBOX_ADMIN"
+WIFI_PASSPHRASE_REMOTE_ACCESS="Koutto!PwnB0x!"
+# Hidden Remote Access Wifi network or not ?
+# 1 is HIDDEN SSID
+# 0 is not hidden
+WIFI_HIDDEN_REMOTE_ACCESS="1"
+
 
 # -------------------------------------------------------------------------------------------------
 
@@ -59,7 +78,7 @@ YELLOW=`tput setaf 3`
 RESET=`tput sgr0`
 
 if [[ $EUID -ne 0 ]]; then
-   echo "${RED}[!] This script must be run as root ${RESET}" 
+   echo "${RED}[!] This script must be run as root ${RESET}"
    exit 1
 fi
 
@@ -94,31 +113,13 @@ read -n 1 -s -r -p "Press any key to continue"
 
 echo "${YELLOW}[~] Update datetime...${RESET}"
 apt-get install -y ntp ntpdate
-ntpdate fr.pool.ntp.org
+ntpdate pool.ntp.org
 date
 cp config/ntpdate.service /etc/systemd/system/ntpdate.service
 chown root:root /etc/systemd/system/ntpdate.service
 chmod 644 /etc/systemd/system/ntpdate.service
 systemctl enable ntpdate
 systemctl start ntpdate
-
-
-# -------------------------------------------------------------------------------------------------
-# WiFi Driver for Device not working out-ot-box on Kali
-
-echo "${YELLOW}[~] Install Wi-Fi drivers for Realtek RTL88x2bu (BrosTrend AC1200 Model AC1L Dongle)...${RESET}"
-# https://fr.scribd.com/document/424931230/AC1L-AC3L-Linux-Manual-BrosTrend-WiFI-Adapter-v4
-wget deb.trendtechcn.com/installer.sh -O /tmp/installer.sh
-chmod +x /tmp/installer.sh
-sudo /tmp/installer.sh
-read -n 1 -s -r -p "Press any key to continue"
-
-echo "${YELLOW}[~] Check Wi-Fi Dongle Realtek RTL88x2bu correct install${RESET}"
-dmesg | grep -i rtl88
-lsusb
-iw dev
-ip a
-read -n 1 -s -r -p "Press any key to continue"
 
 
 # -------------------------------------------------------------------------------------------------
@@ -200,8 +201,8 @@ read -n 1 -s -r -p "Press any key to continue"
 echo "${YELLOW}[~] Ensure Network Interface names are persistent and predictable... ${RESET}"
 echo "${YELLOW}eth0 => Ethernet${RESET}"
 echo "${YELLOW}wlan0 => Built-in Wi-Fi interface${RESET}"
-echo "${YELLOW}${WLAN_INTERFACE_BROSTREND_AC1L} => USB Adapter BrosTrend AC1L - Chipset Realtek RTL88x2bu${RESET}"
-echo "${YELLOW}${WLAN_INTERFACE_ALFA_AWUS036NEH} => USB Adapter Alfa AWUS036NEH - Chipset Ralink RT2870/RT3070${RESET}"
+echo "${YELLOW}${WLAN_INTERFACE_TENDA_NANO} => USB Adapter Tenda W311M NANO - Chipset Ralink RT5370${RESET}"
+echo "${YELLOW}${WLAN_INTERFACE_TENDA_U12} => USB Adapter Tenda U12 - Chipset Realtek RTL8812AU${RESET}"
 echo "${YELLOW}${WLAN_INTERFACE_ALFA_AWUS036ACH} => USB Adapter Alfa AWUS036ACH - Chipset Realtek RTL8812AU${RESET}"
 # Note: We do not use wlan1, wlan2... naming for USB dongles devices because Udev feature appeared bugged
 # during tests (https://wiki.debian.org/NetworkInterfaceNames) and we need consistent naming to avoid confusion
@@ -238,30 +239,28 @@ auto eth0
 allow-hotplug eth0
 iface eth0 inet dhcp
 
-# wlan0: Built-in WiFi interface (Broadcom 43430)
 # Used to connect to Internet (when eth0 not used)
-auto wlan0
-allow-hotplug wlan0
-iface wlan0 inet dhcp
+auto ${WLAN_INTERFACE_INTERNET}
+allow-hotplug ${WLAN_INTERFACE_INTERNET}
+iface ${WLAN_INTERFACE_INTERNET} inet dhcp
 wpa-conf /etc/wpa_supplicant.conf
 iface default inet dhcp
 
 
-# WiFi USB Adapter BrosTrend AC1200 Realtek RTL88x2bu
 # Used to set up AP at boot for pwnbox access via WiFi
-allow-hotplug ${WLAN_INTERFACE_BROSTREND_AC1L}
-iface ${WLAN_INTERFACE_BROSTREND_AC1L} inet static
+allow-hotplug ${WLAN_INTERFACE_REMOTE_ACCESS}
+iface ${WLAN_INTERFACE_REMOTE_ACCESS} inet static
   address 10.0.0.1
   netmask 255.255.255.0
   up route add -net 10.0.0.0 netmask 255.255.255.0 gw 10.0.0.1
-# iface ${WLAN_INTERFACE_BROSTREND_AC1L} inet manual
-# ifdown ${WLAN_INTERFACE_BROSTREND_AC1L}
+# iface ${WLAN_INTERFACE_REMOTE_ACCESS} inet manual
+# ifdown ${WLAN_INTERFACE_REMOTE_ACCESS}
 
 
-# WiFi USB Adapter Alfa AWUS036NEH Ralink RT2870/RT3070
+# WiFi USB Adapter Tenda U12 AC1300
 # Disabled by default at boot
-iface ${WLAN_INTERFACE_ALFA_AWUS036NEH} inet manual
-ifdown ${WLAN_INTERFACE_ALFA_AWUS036NEH}
+iface ${WLAN_INTERFACE_TENDA_U12} inet manual
+ifdown ${WLAN_INTERFACE_TENDA_U12}
 
 # WiFi USB Adapter Alfa AWUS036ACH Realtek RTL8812AU
 # Disabled by default at boot
@@ -276,7 +275,7 @@ read -n 1 -s -r -p "Press any key to continue"
 
 # -------------------------------------------------------------------------------------------------
 # Setup AP at boot for pwnbox access via WiFi
-# WiFi Interface used: WiFi USB Adapter BrosTrend AC1200 Realtek RTL88x2bu
+# WiFi Interface used: On-chip wifi interface
 # SSID: PWNBOX_ADMIN (Hidden)
 # IP Range: 10.0.0.1/24 (DHCP enabled)
 # IP PwnBox/AP: 10.0.0.1
@@ -286,7 +285,7 @@ echo "${YELLOW}[~] Configure dnsmasq...${RESET}"
 mv /etc/dnsmasq.conf /etc/dnsmasq.conf.old
 cat > /etc/dnsmasq.conf <<EOF
 
-interface=${WLAN_INTERFACE_BROSTREND_AC1L}
+interface=${WLAN_INTERFACE_REMOTE_ACCESS}
 dhcp-authoritative
 dhcp-range=10.0.0.2,10.0.0.30,255.255.255.0,12h
 dhcp-option=3,10.0.0.1
@@ -304,16 +303,16 @@ echo "${YELLOW}[~] Configure hostapd...${RESET}"
 mv /etc/hostapd/hostapd.conf /etc/hostapd.conf.old
 cat > /etc/hostapd/hostapd.conf <<EOF
 
-interface=${WLAN_INTERFACE_BROSTREND_AC1L}
+interface=${WLAN_INTERFACE_REMOTE_ACCESS}
 driver=nl80211
-ssid=PWNBOX_ADMIN
+ssid=${WIFI_SSID_REMOTE_ACCESS}
 hw_mode=g
 channel=11
 macaddr_acl=0
-ignore_broadcast_ssid=1 # hidden SSID
+ignore_broadcast_ssid=${WIFI_HIDDEN_REMOTE_ACCESS} # hidden SSID
 auth_algs=1
 wpa=2
-wpa_passphrase=Koutto!PwnB0x!
+wpa_passphrase=${WIFI_PASSPHRASE_REMOTE_ACCESS}
 wpa_key_mgmt=WPA-PSK
 wpa_pairwise=CCMP
 wpa_group_rekey=86400
@@ -456,5 +455,4 @@ read -n 1 -s -r -p "Press any key to continue"
 updatedb
 
 echo "${GREEN}[+] Install script finished. Now Reboot !"
-echo 
-
+echo
