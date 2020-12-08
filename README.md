@@ -14,7 +14,7 @@ Designed to be used for:
 
 
 
-![Pi-PwnBox-RogueAP](img/pwnbox-rogueap.png)
+![Pi-PwnBox-RogueAP](img/pwnbox-rogueap.jpg)
 
 
 
